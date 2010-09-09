@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 # translate
 # http://perigee.tremby.net/utils/translate
 #
@@ -30,6 +29,27 @@ import re
 import htmlentitydefs
 import json
 
+'''
+  Reverse a Unicode string with proper handling of combining characters
+
+  taken from http://paddy3118.blogspot.com/2009/07/case-of-disappearing-over-bar.html
+  modified according to blog comment 2 about combining chars.
+'''
+import unicodedata
+def ureverse(ustring):
+    groupedchars = []
+    uchar = list(ustring)
+    while uchar:
+        if (unicodedata.combining(uchar[0]) != 0): 
+            groupedchars[-1] += uchar.pop(0)
+        else:
+            groupedchars.append(uchar.pop(0))
+    # Grouped reversal
+    groupedchars = groupedchars[::-1]
+
+    return ''.join(groupedchars)
+
+
 # json decoding function -- if Python < 2.6 assume python-json
 if sys.version_info >= (2, 6):
 	jsondecode = json.loads
@@ -38,6 +58,9 @@ else:
 
 #translateurl = "http://www.google.com/uds/Gtranslate" # used in the documentation's example code, possibly not meant for general usage
 translateurl = "http://ajax.googleapis.com/ajax/services/language/translate"
+
+# add language codes for right-to-left languages here to ensure they're correctly reversed
+rtlscripts = ['ar']
 
 def usage(stdout = False):
 	stream = sys.stdout if stdout else sys.stderr
@@ -210,7 +233,10 @@ try:
 	request = urllib2.Request(translateurl)
 	request.add_data(urllib.urlencode(data))
 	request.add_header("Referer", "http://perigee.tremby.net/utils/translate")
-	response = jsondecode(urllib2.urlopen(request).read())
+        #pdb.set_trace()
+        doc = urllib2.urlopen(request).read()
+        response = jsondecode(doc) 
+        #response = jsondecode(urllib2.urlopen(request).read())
 except:
 	print >> sys.stderr, "Error getting response from Google or parsing response:"
 	print >> sys.stderr, sys.exc_info()
@@ -226,7 +252,10 @@ elif response["responseStatus"] == 200:
 	if "detectedSourceLanguage" in response["responseData"]:
 		print >> sys.stderr, "Detected source language: %s" % response["responseData"]["detectedSourceLanguage"]
 	try:
-		print htmlentities_decode(response["responseData"]["translatedText"])
+		txt = htmlentities_decode(response["responseData"]["translatedText"])
+                if langdest in rtlscripts:
+                        txt = ureverse(txt)
+                print txt
 	except:
 		print >> sys.stderr, "Error printing response to stdout:"
 		print >> sys.stderr, sys.exc_info()
@@ -238,3 +267,4 @@ else:
 	sys.exit(128)
 
 # vi: set ts=4 sts=4 sw=4 tw=80
+
